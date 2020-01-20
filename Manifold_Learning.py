@@ -170,24 +170,13 @@ def DiffusionMap(X, d, sigma, t):
     :return: Nxd reduced data matrix.
     '''
 
-    n = X.shape[0]
     dist_matrix = euclidean_distances(X, squared=True)
     heat_kernel = np.exp(- dist_matrix / (sigma ** 2))
-    row_sums = heat_kernel.sum(axis=1)
-    # A = heat_kernel / row_sums[:, np.newaxis]
     A = normalize(heat_kernel, axis=1, norm='l1')
     eig_vals, eig_vecs = np.linalg.eig(A)
-    eig_vals = np.real(eig_vals)
-    eig_vecs = np.real(eig_vecs)
-    idx = eig_vals.argsort()[::-1]
-    eig_vals_sorted = eig_vals[idx]
-    eig_vecs_sorted = eig_vecs[:, idx]
+    idx = eig_vals.argsort()[::-1][1: d + 1]
 
-    reduced_mat = np.zeros([n, d])
-    for i in range(d):
-        reduced_mat[:, i] = eig_vecs_sorted[i + 1] * (eig_vals_sorted[i + 1] ** t)
-
-    return reduced_mat
+    return eig_vecs[:, idx] * (eig_vals[idx] **t)
 
 
 def LLE_plot(X, color):
@@ -209,8 +198,8 @@ def MDS_plot(X , color):
     plt.show()
 
 def DiffusionMap_plot(X, color):
-    for t in np.arange(80, 100, 3):
-        for sig in np.arange(0.05, 0.5, 0.05):
+    for t in np.arange(3, 100, 1):
+        for sig in np.arange(1e-3, 0.5, 0.05):
             ans = DiffusionMap(X, 2, sig, t)
             fig = plt.figure()
             ax = fig.add_subplot(111)
@@ -220,7 +209,7 @@ def DiffusionMap_plot(X, color):
 
 if __name__ == '__main__':
     X, color = datasets._samples_generator.make_swiss_roll(n_samples=2000)
-    MDS_plot(X, color)
+    DiffusionMap_plot(X, color)
 
     # MDS_plot(X, color)
     # LLE_plot(X, color)
