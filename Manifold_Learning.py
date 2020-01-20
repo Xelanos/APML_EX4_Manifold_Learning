@@ -4,6 +4,7 @@ import numpy as np
 from sklearn import datasets
 from sklearn.neighbors import KDTree
 from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.preprocessing import normalize
 from mpl_toolkits.mplot3d import Axes3D
 
 
@@ -112,18 +113,12 @@ def MDS(X, d):
     '''
 
     n = X.shape[0]
-    dist_matrix = euclidean_distances(X, X, squared=True)
     center_mat = np.identity(n) - (1/n * np.ones([n, n]))
-    S = -0.5 * (center_mat @ dist_matrix @ center_mat)
+    S = -0.5 * (center_mat @ X @ center_mat)
     eig_vals, eig_vecs = np.linalg.eig(S)
-    eig_vals_sorted = np.sort(eig_vals)
-    eig_vecs_sorted = eig_vecs[:, eig_vals.argsort()]
+    idx = np.argsort(eig_vals)[::-1][:d]
 
-    reduced_mat = np.zeros([n, d])
-    for i in range(d):
-        reduced_mat[:, i] = eig_vecs_sorted[i] * (eig_vals_sorted[i] ** 0.5)
-
-    return reduced_mat
+    return eig_vecs[:, idx] * (eig_vals[idx] ** 0.5)
 
 def generate_weight_matrix(X, k):
     N = X.shape[0]
@@ -132,7 +127,7 @@ def generate_weight_matrix(X, k):
     for i in range(N):
         x_i = X[i]
         neighbors_idx = tree.query(x_i.reshape(1, -1), k=k + 1, return_distance=False)
-        neighbors_idx = np.delete(neighbors_idx, [0]) # taking 1 more neighbour and ignoring x_i
+        neighbors_idx = np.delete(neighbors_idx, [0])  # taking 1 more neighbour and ignoring x_i
         x_i_neighbors = X[neighbors_idx]
         z_vectors = x_i_neighbors - x_i
         grahm_mat = z_vectors @ z_vectors.T
@@ -156,8 +151,7 @@ def LLE(X, d, k):
     W = generate_weight_matrix(X, k)
     M = np.identity(W.shape[0]) - W
     eig_vals, eig_vecs = np.linalg.eig(np.transpose(M) @ M)
-    eig_vecs_indexes = eig_vals.argsort()[:-1]
-    eig_vecs_indexes = eig_vecs_indexes[-d:]
+    eig_vecs_indexes = eig_vals.argsort()[1: d+1]
     return eig_vecs[:, eig_vecs_indexes]
 
 
@@ -177,39 +171,74 @@ def DiffusionMap(X, d, sigma, t):
     '''
 
     n = X.shape[0]
-    dist_matrix = euclidean_distances(X, X, squared=True)
-    heat_kernel = np.exp(- dist_matrix / (2. * sigma ** 2))
+    dist_matrix = euclidean_distances(X, squared=True)
+    heat_kernel = np.exp(- dist_matrix / (sigma ** 2))
     row_sums = heat_kernel.sum(axis=1)
-    A = heat_kernel / row_sums[:, np.newaxis]
+    # A = heat_kernel / row_sums[:, np.newaxis]
+    A = normalize(heat_kernel, axis=1, norm='l1')
     eig_vals, eig_vecs = np.linalg.eig(A)
-    eig_vals_sorted = np.sort(eig_vals)[1: d+1]
-    eig_vecs_sorted = eig_vecs[:, eig_vals.argsort()]
+    eig_vals = np.real(eig_vals)
+    eig_vecs = np.real(eig_vecs)
+    idx = eig_vals.argsort()[::-1]
+    eig_vals_sorted = eig_vals[idx]
+    eig_vecs_sorted = eig_vecs[:, idx]
 
     reduced_mat = np.zeros([n, d])
     for i in range(d):
-        reduced_mat[:, i] = eig_vecs_sorted[i] * (eig_vals_sorted[i] ** t)
+        reduced_mat[:, i] = eig_vecs_sorted[i + 1] * (eig_vals_sorted[i + 1] ** t)
 
     return reduced_mat
 
 
-if __name__ == '__main__':
+def LLE_plot(X, color):
+    for k in range(10, 26):
+        ans = LLE(X, 2, k)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.set_title(f'LLE of swiss roll.  k={k}')
+        ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
+        plt.show()
 
+def MDS_plot(X , color):
+    X = euclidean_distances(X)
+    ans = MDS(X, 2)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_title(f'MDS of swiss roll')
+    ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
+    plt.show()
 
-    X, color = datasets._samples_generator.make_swiss_roll(n_samples=2000)
-
-    for t in np.arange(0.01, 0.5, 0.05):
-        for sig in np.arange(1, 10, 1):
+def DiffusionMap_plot(X, color):
+    for t in np.arange(80, 100, 3):
+        for sig in np.arange(0.05, 0.5, 0.05):
             ans = DiffusionMap(X, 2, sig, t)
             fig = plt.figure()
             ax = fig.add_subplot(111)
-            ax.set_title(f'DiffusionMap of swiss roll. sigma={sig}, t={t}')
+            ax.set_title(f'DiffusionMap of swiss roll. t={t}, sigma={sig}')
             ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
             plt.show()
 
-    # plot the data:
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(X[:, 0], X[:, 1], X[:, 2], c=color, cmap=plt.cm.Spectral)
-    plt.show()
+if __name__ == '__main__':
+    X, color = datasets._samples_generator.make_swiss_roll(n_samples=2000)
+    MDS_plot(X, color)
+
+    # MDS_plot(X, color)
+    # LLE_plot(X, color)
+
+    # for t in np.arange(0.01, 0.5, 0.05):
+    #     for sig in np.arange(1, 10, 1):
+    #         ans = DiffusionMap(X, 2, sig, t)
+    #         fig = plt.figure()
+    #         ax = fig.add_subplot(111, projection='3d')
+    #         ax.set_title(f'DiffusionMap of swiss roll. sigma={sig}, t={t}')
+    #         ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
+    #         plt.show()
+
+    #
+    # # plot the data:
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(X[:, 0], X[:, 1], X[:, 2], c=color, cmap=plt.cm.Spectral)
+    # plt.show()
 
     pass
