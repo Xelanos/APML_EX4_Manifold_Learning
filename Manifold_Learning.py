@@ -5,6 +5,7 @@ from sklearn import datasets
 from sklearn.neighbors import KDTree
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.preprocessing import normalize
+from scipy.stats import special_ortho_group
 from mpl_toolkits.mplot3d import Axes3D
 
 
@@ -118,7 +119,7 @@ def MDS(X, d):
     eig_vals, eig_vecs = np.linalg.eig(S)
     idx = np.argsort(eig_vals)[::-1][:d]
 
-    return eig_vecs[:, idx] * (eig_vals[idx] ** 0.5)
+    return eig_vecs[:, idx] * (eig_vals[idx] ** 0.5) , eig_vals
 
 def generate_weight_matrix(X, k):
     N = X.shape[0]
@@ -176,58 +177,146 @@ def DiffusionMap(X, d, sigma, t):
     eig_vals, eig_vecs = np.linalg.eig(A)
     idx = eig_vals.argsort()[::-1][1: d + 1]
 
-    return eig_vecs[:, idx] * (eig_vals[idx] **t)
+    return eig_vecs[:, idx] * (eig_vals[idx] ** t)
 
 
-def LLE_plot(X, color):
-    for k in range(10, 26):
-        ans = LLE(X, 2, k)
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.set_title(f'LLE of swiss roll.  k={k}')
-        ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
-        plt.show()
+def SwissRoll():
+    # data and meta-variables
+    X, color = datasets._samples_generator.make_swiss_roll(n_samples=2000)
+    dataset = 'swiss roll'
+    d = 2
+    k = 12
+    sig = 10
+    t = 3
 
-def MDS_plot(X , color):
-    X = euclidean_distances(X)
-    ans = MDS(X, 2)
+    # MDS
+    distances = euclidean_distances(X)
+    ans = MDS(distances, d)
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.set_title(f'MDS of swiss roll')
+    ax.set_title(f'MDS of {dataset}')
     ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
     plt.show()
 
-def DiffusionMap_plot(X, color):
-    for t in np.arange(3, 100, 1):
-        for sig in np.arange(1e-3, 0.5, 0.05):
-            ans = DiffusionMap(X, 2, sig, t)
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
-            ax.set_title(f'DiffusionMap of swiss roll. t={t}, sigma={sig}')
-            ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
-            plt.show()
+    # LLE
+    ans = LLE(X, d, k)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_title(f'LLE of {dataset}.  k={k}')
+    ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
+    plt.show()
+
+    # DiffusionMap
+    ans = DiffusionMap(X, d, sig, t)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_title(f'DiffusionMap of {dataset}. t={t}, sigma={sig}')
+    ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
+    plt.show()
+
+def MNIST():
+    # data and meta-variables
+    digits = datasets.load_digits()
+    X = digits.data / 255.
+    color = digits.target
+    dataset = 'MNIST'
+    d = 2
+    k = 13
+    sig = 0.1
+    t = 0.1
+
+    # MDS
+    distances = euclidean_distances(X)
+    ans = MDS(distances, d)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_title(f'MDS of {dataset}')
+    scatter = ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
+    legend = ax.legend(*scatter.legend_elements(),  loc="lower left", title="Numbers")
+    ax.add_artist(legend)
+    plt.show()
+
+    # LLE
+    ans = LLE(X, d, k)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_title(f'LLE of {dataset}.  k={k}')
+    scatter = ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
+    legend = ax.legend(*scatter.legend_elements(), loc="lower left", title="Numbers")
+    ax.add_artist(legend)
+    plt.show()
+
+    # DiffusionMap
+    ans = DiffusionMap(X, d, sig, t)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_title(f'DiffusionMap of {dataset}. t={t}, sigma={sig}')
+    scatter = ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
+    legend = ax.legend(*scatter.legend_elements(), loc="lower left", title="Numbers")
+    ax.add_artist(legend)
+    plt.show()
+
+
+def Faces():
+    # data and meta-variables
+    path = 'faces.pickle'
+    with open(path, 'rb') as f:
+        X = pickle.load(f)
+
+    num_images, num_pixels = np.shape(X)
+    dataset = 'Faces'
+    d = 2
+    k = 30
+    sig = 18
+    t = 36
+
+    # MDS
+    distances = euclidean_distances(X)
+    ans = MDS(distances, d)
+    plot_with_images(ans, X, f'MDS of {dataset}')
+    plt.show()
+
+    # LLE
+    ans = LLE(X, d, k)
+    plot_with_images(ans, X, f'LLE of {dataset}.  k={k}', image_num=40)
+    plt.show()
+
+    # DiffusionMap
+
+    ans = DiffusionMap(X, d, sig, t)
+    plot_with_images(ans, X, f'DiffusionMap of {dataset}. t={t}, sigma={sig}', image_num=70)
+    plt.show()
+
+
+def CustomSet():
+    original_dim = 2
+    num_of_points = 2000
+    random = np.random.rand(num_of_points, original_dim)
+
+    higher_dim = 70
+    rot_matrix = special_ortho_group.rvs(dim=higher_dim)
+    padded = np.zeros([num_of_points, higher_dim])
+    padded[:random.shape[0], :random.shape[1]] = random
+    ebmded_data = padded @ rot_matrix
+
+    for noise_level in np.arange(0, 10, 0.5):
+        noised_data = ebmded_data + noise_level * np.random.normal(size=higher_dim)
+        noised_data = euclidean_distances(noised_data)
+
+        ans, eigan_vals = MDS(noised_data, 10)
+        eigan_vals = eigan_vals[eigan_vals.argsort()[::-1]]
+        plt.figure()
+        plt.title(f'Scree plot, noise level={noise_level}')
+        plt.plot(eigan_vals[:10])
+        plt.show()
+
+
+
+
 
 if __name__ == '__main__':
-    X, color = datasets._samples_generator.make_swiss_roll(n_samples=2000)
-    DiffusionMap_plot(X, color)
+    CustomSet()
+    # SwissRoll()
+    # MNIST()
+    # Faces()
 
-    # MDS_plot(X, color)
-    # LLE_plot(X, color)
-
-    # for t in np.arange(0.01, 0.5, 0.05):
-    #     for sig in np.arange(1, 10, 1):
-    #         ans = DiffusionMap(X, 2, sig, t)
-    #         fig = plt.figure()
-    #         ax = fig.add_subplot(111, projection='3d')
-    #         ax.set_title(f'DiffusionMap of swiss roll. sigma={sig}, t={t}')
-    #         ax.scatter(ans[:, 0], ans[:, 1], c=color, cmap=plt.cm.Spectral)
-    #         plt.show()
-
-    #
-    # # plot the data:
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # ax.scatter(X[:, 0], X[:, 1], X[:, 2], c=color, cmap=plt.cm.Spectral)
-    # plt.show()
-
-    pass
