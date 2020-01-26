@@ -299,17 +299,47 @@ def CustomSet():
     padded[:random.shape[0], :random.shape[1]] = random
     ebmded_data = padded @ rot_matrix
 
-    for noise_level in np.arange(0, 10, 0.5):
-        noised_data = ebmded_data + noise_level * np.random.normal(size=higher_dim)
+    plt.figure()
+    plot_number = 1
+    for noise_level in np.arange(0, 0.4, 0.1):
+        noised_data = ebmded_data + noise_level * np.random.normal(size=ebmded_data.shape)
         noised_data = euclidean_distances(noised_data)
 
         ans, eigan_vals = MDS(noised_data, 10)
         eigan_vals = eigan_vals[eigan_vals.argsort()[::-1]]
-        plt.figure()
+        plt.subplot(4, 1, plot_number)
         plt.title(f'Scree plot, noise level={noise_level}')
-        plt.plot(eigan_vals[:10])
-        plt.show()
+        plt.plot(eigan_vals[:15])
+        plot_number += 1
+    plt.show()
 
+    plt.figure()
+    plot_number = 1
+    for noise_level in np.arange(0.4, 0.8, 0.1):
+        noised_data = ebmded_data + noise_level * np.random.normal(size=ebmded_data.shape)
+        noised_data = euclidean_distances(noised_data)
+
+        ans, eigan_vals = MDS(noised_data, 10)
+        eigan_vals = eigan_vals[eigan_vals.argsort()[::-1]]
+        plt.subplot(4, 1, plot_number)
+        plt.title(f'Scree plot, noise level={noise_level}')
+        plt.plot(eigan_vals[:15])
+        plot_number += 1
+    plt.show()
+
+    plt.figure()
+    plot_number = 1
+    for noise_level in np.arange(0.8, 1.01, 0.1):
+        noised_data = ebmded_data + noise_level * np.random.normal(size=ebmded_data.shape)
+        noised_data = euclidean_distances(noised_data)
+
+        ans, eigan_vals = MDS(noised_data, 10)
+        eigan_vals = eigan_vals[eigan_vals.argsort()[::-1]]
+        plt.subplot(3, 1, plot_number)
+        plt.title(f'Scree plot, noise level={noise_level}')
+        plt.plot(eigan_vals[:15])
+        plot_number += 1
+    plt.show()
 
 
 
